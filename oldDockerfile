@@ -1,0 +1,47 @@
+# =============================
+# Stage 1: Builder (CUDA + PyTorch + Build Tools)
+# =============================
+FROM pytorch/pytorch:2.2.0-cuda11.8-cudnn8-devel AS builder
+# └─ This image is: Ubuntu 22.04 + CUDA 11.8 + cuDNN 8 + GPU-enabled PyTorch 2.2.0, plus all necessary CUDA headers/tools.
+#    It also already has Python 3.11 and pip installed.
+
+# Install any additional system packages needed to compile native extensions or clone repos
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      git \
+      build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Clone the particle_transformer repository
+RUN git clone https://github.com/jet-universe/particle_transformer.git
+
+# Install Python dependencies into a temporary “/install” prefix.
+# Since this base image already contains a GPU-enabled torch, we do NOT need to pip-install torch again.
+# We only pip-install "weaver-core" (and any other Python packages you need).
+RUN pip install --upgrade pip && \
+    pip install --prefix=/install --no-cache-dir "weaver-core>=0.4"
+
+# =============================
+# Stage 2: Final Runtime (CUDA runtime + Python packages only)
+# =============================
+FROM pytorch/pytorch:2.2.0-cuda11.8-cudnn8-runtime
+# └─ “runtime” tag is slimmer than “devel”: it still has CUDA & cuDNN & GPU-enabled PyTorch, 
+#    but it does not include compilers, headers, or build tools.
+
+WORKDIR /app
+
+# Copy only the installed Python dependencies from the builder
+COPY --from=builder /install /usr/local
+
+# Copy the cloned repository (no build tools / git in final image)
+COPY --from=builder /build/particle_transformer /app/particle_transformer
+
+# (Optional) If you need any environment variables, set them here:
+# ENV MODEL_PATH=/app/particle_transformer/model.onnx
+
+# By default, drop you into bash. When running, use “docker run -it … /bin/bash” or 
+# exec into an interactive shell. You can also replace this CMD with your training/inference script.
+CMD [ "/bin/bash" ]

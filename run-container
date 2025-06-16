@@ -1,0 +1,23 @@
+#!/bin/bash
+
+CONTAINER_NAME="particle-transformer"
+IMAGE_NAME="particle-transformer"  # replace this with the actual image name or build command
+
+# Check if the container exists (any state)
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "Container ${CONTAINER_NAME} exists."
+    # Check if container is running
+    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+        echo "Container is already running. Attaching..."
+        docker exec -it "${CONTAINER_NAME}" /bin/bash
+    else
+        echo "Starting container..."
+        docker start "${CONTAINER_NAME}"
+        echo "Attaching to container..."
+        docker exec -it "${CONTAINER_NAME}" /bin/bash
+    fi
+else
+    echo "Container does not exist. Creating and running..."
+    docker run -it --name "${CONTAINER_NAME}" "${IMAGE_NAME}" /bin/bash
+fi
+
